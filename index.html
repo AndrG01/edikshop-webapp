@@ -14,23 +14,7 @@
             --light-color: #f8f9fa;
             --accent-color: #ff2d75;
         }
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        body {
-            background: linear-gradient(135deg, var(--dark-color), #16213e);
-            color: var(--light-color);
-            min-height: 100vh;
-            padding: 20px;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        /* Остальные стили... */
+        /* ... остальные стили ... */
     </style>
 </head>
 <body>
@@ -47,88 +31,45 @@
         tg.expand();
         tg.ready();
         
-        // Замените на ваш токен бота
-        const BOT_TOKEN = '7819992952:AAGfhDbU_0RuzsglYlmsTNfgmqsu44wXgBY';
+        // Обработчик для получения данных от бота
+        tg.onEvent('viewportChanged', () => {
+            console.log('Viewport changed');
+        });
         
+        // Основная функция загрузки игр
         async function loadGames() {
             try {
-                // Получаем user_id из Telegram WebApp
-                const user = tg.initDataUnsafe.user;
-                const user_id = user?.id;
+                // 1. Показываем статус загрузки
+                document.getElementById('gamesContainer').innerHTML = '<div class="loading">Загрузка игр...</div>';
                 
-                if (!user_id) {
-                    throw new Error("User not authorized");
-                }
-                
-                // Отправляем запрос к боту через WebApp
+                // 2. Отправляем запрос к боту через WebApp
                 tg.sendData(JSON.stringify({
-                    action: "get_games",
-                    user_id: user_id
+                    action: "get_games_list"
                 }));
                 
-                // В реальном приложении здесь нужно получать ответ от бота
-                // Для примера используем setTimeout как заглушку
+                // 3. Временное решение - через 2 секунды показываем ошибку,
+                // если не получили ответ от бота
                 setTimeout(() => {
-                    // Это временное решение - в реальном приложении получайте данные от бота
-                    const mockGames = [
-                        {name: "Cyberpunk 2077", platform: "PC", price: 1999},
-                        {name: "Elden Ring", platform: "PC/PS5", price: 2499}
-                    ];
-                    renderGames(mockGames);
-                }, 1000);
+                    if (document.getElementById('gamesContainer').innerHTML.includes('Загрузка игр...')) {
+                        throw new Error("Timeout - no response from bot");
+                    }
+                }, 2000);
                 
             } catch (error) {
-                console.error("Ошибка:", error);
-                document.getElementById('gamesContainer').innerHTML = 
-                    '<div class="loading">Ошибка загрузки. Попробуйте позже.</div>';
+                console.error("Ошибка загрузки:", error);
+                showError("Не удалось загрузить игры. Попробуйте позже.");
             }
         }
         
-        function renderGames(games) {
+        // Функция отображения ошибки
+        function showError(message) {
             const container = document.getElementById('gamesContainer');
-            container.innerHTML = '';
-            
-            if (!games || games.length === 0) {
-                container.innerHTML = '<div class="loading">Игры не найдены</div>';
-                return;
-            }
-            
-            const grid = document.createElement('div');
-            grid.className = 'games-grid';
-            
-            games.forEach(game => {
-                const card = document.createElement('div');
-                card.className = 'game-card';
-                card.innerHTML = `
-                    <div class="game-info">
-                        <div class="game-title">${game.name}</div>
-                        <div class="game-platform">${game.platform}</div>
-                        <div class="game-footer">
-                            <div class="game-price">${game.price} ₽</div>
-                            <button class="game-btn" data-game="${game.name}">В корзину</button>
-                        </div>
-                    </div>
-                `;
-                grid.appendChild(card);
-            });
-            
-            container.appendChild(grid);
-            
-            // Добавляем обработчики кнопок
-            document.querySelectorAll('.game-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const gameName = btn.getAttribute('data-game');
-                    addToCart(gameName);
-                });
-            });
-        }
-        
-        function addToCart(gameName) {
-            tg.sendData(JSON.stringify({
-                action: "add_to_cart",
-                product: gameName
-            }));
-            tg.showAlert(`"${gameName}" добавлен в корзину!`);
+            container.innerHTML = `
+                <div class="error-message">
+                    ${message}
+                    <button onclick="location.reload()">⟳ Обновить</button>
+                </div>
+            `;
         }
         
         // Инициализация при загрузке
