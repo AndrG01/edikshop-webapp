@@ -76,6 +76,7 @@
                 html += `
                     <div class="game-item">
                         <h3>${game.name}</h3>
+                        <p>Платформа: ${game.platform || 'Не указана'}</p>
                         <p>Цена: ${game.price} руб.</p>
                         <button onclick="addToCart('${game.name}')">В корзину</button>
                     </div>
