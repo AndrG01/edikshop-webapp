@@ -2,26 +2,33 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>EdikShop</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
-            background-color: #f5f5f5;
             margin: 0;
-            padding: 20px;
+            padding: 15px;
+            background-color: #f5f5f5;
         }
-        #app {
-            max-width: 800px;
-            margin: 0 auto;
+        .game-item {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
         }
         .error {
             color: red;
-            text-align: center;
-            padding: 20px;
-        }
-        .loading {
             text-align: center;
             padding: 20px;
         }
@@ -31,83 +38,70 @@
     <div id="app">
         <h1>EDIKSHOP</h1>
         <div id="content">
-            <div class="loading">Загрузка данных...</div>
+            <div class="loading">Загрузка...</div>
         </div>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
-        
-        // Инициализация WebApp
         tg.expand();
         tg.ready();
-        
-        // Обработчик получения данных от бота
+
+        // Улучшенная функция отправки данных
+        function sendToBot(data) {
+            return new Promise((resolve, reject) => {
+                try {
+                    tg.sendData(JSON.stringify(data));
+                    resolve();
+                } catch (e) {
+                    reject(e);
+                }
+            });
+        }
+
+        // Обработчик получения данных
         Telegram.WebApp.onEvent('webAppDataReceived', (event) => {
             try {
                 const data = JSON.parse(event.data);
-                
                 if (data.type === 'games_list') {
                     renderGames(data.data);
-                } else if (data.type === 'error') {
-                    showError(data.message);
                 }
             } catch (e) {
                 showError("Ошибка обработки данных");
-                console.error("Parse error:", e);
             }
         });
-        
-        // Функция отображения ошибки
-        function showError(message) {
-            document.getElementById('content').innerHTML = `
-                <div class="error">
-                    ${message}
-                    <button onclick="window.location.reload()">Обновить</button>
-                </div>
-            `;
-        }
-        
-        // Функция отображения списка игр
+
         function renderGames(games) {
-            let html = '<div class="games-list">';
-            
+            let html = '';
             games.forEach(game => {
                 html += `
                     <div class="game-item">
                         <h3>${game.name}</h3>
-                        <p>Платформа: ${game.platform || 'Не указана'}</p>
+                        <p>Платформа: ${game.platform}</p>
                         <p>Цена: ${game.price} руб.</p>
                         <button onclick="addToCart('${game.name}')">В корзину</button>
                     </div>
                 `;
             });
-            
-            html += '</div>';
-            document.getElementById('content').innerHTML = html;
+            document.getElementById('content').innerHTML = html || '<div class="error">Нет доступных игр</div>';
         }
-        
-        // Функция добавления в корзину
-        function addToCart(gameName) {
-            tg.sendData(JSON.stringify({
-                action: "add_to_cart",
-                product: gameName
-            }));
-            tg.showAlert(`"${gameName}" добавлен в корзину!`);
+
+        async function addToCart(gameName) {
+            try {
+                await sendToBot({action: "add_to_cart", product: gameName});
+                tg.showAlert(`"${gameName}" добавлен в корзину!`);
+            } catch (e) {
+                showError("Ошибка добавления в корзину");
+            }
         }
-        
-        // Запрос данных при загрузке
-        document.addEventListener('DOMContentLoaded', () => {
-            tg.sendData(JSON.stringify({
-                action: "get_games"
-            }));
-            
-            // Таймаут на случай отсутствия ответа
-            setTimeout(() => {
-                if (document.getElementById('content').innerHTML.includes('Загрузка данных...')) {
-                    showError("Превышено время ожидания ответа");
-                }
-            }, 5000);
+
+        // Инициализация
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                await sendToBot({action: "get_games"});
+            } catch (e) {
+                showError("Ошибка загрузки данных");
+            }
         });
     </script>
 </body>
