@@ -3,79 +3,69 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EdikShop - Магазин игр</title>
+    <title>EdikShop</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://telegram.org; script-src 'self' https://telegram.org 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src * data:;">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        /* Ваши стили остаются без изменений */
-        :root {
-            --main-color: #6a11cb;
-            --secondary-color: #2575fc;
-            --dark-color: #1a1a2e;
-            --light-color: #f8f9fa;
-            --accent-color: #ff2d75;
-        }
-        /* ... остальные стили ... */
+        /* Ваши существующие стили */
     </style>
 </head>
 <body>
-    <div class="container">
+    <div id="app">
         <header>
-            <div class="logo">EDIKSHOP</div>
-            <button class="cart-btn" id="cartBtn">🛒 Корзина</button>
+            <h1>EDIKSHOP</h1>
+            <button id="cartBtn">🛒 Корзина</button>
         </header>
-        <div id="gamesContainer"><div class="loading">Загрузка игр...</div></div>
+        <div id="gamesContainer">
+            <div class="loading">Загрузка игр...</div>
+        </div>
     </div>
 
     <script>
+        // Инициализация WebApp
         const tg = window.Telegram.WebApp;
         tg.expand();
         tg.ready();
         
-        // Обработчик для получения данных от бота
-        tg.onEvent('viewportChanged', () => {
-            console.log('Viewport changed');
-        });
+        // Элементы интерфейса
+        const gamesContainer = document.getElementById('gamesContainer');
+        const cartBtn = document.getElementById('cartBtn');
         
-        // Основная функция загрузки игр
+        // Основная функция загрузки
         async function loadGames() {
             try {
                 // 1. Показываем статус загрузки
-                document.getElementById('gamesContainer').innerHTML = '<div class="loading">Загрузка игр...</div>';
+                gamesContainer.innerHTML = '<div class="loading">Загрузка игр...</div>';
                 
-                // 2. Отправляем запрос к боту через WebApp
+                // 2. Отправляем запрос к боту
                 tg.sendData(JSON.stringify({
-                    action: "get_games_list"
+                    action: "get_games",
+                    user_id: tg.initDataUnsafe.user?.id
                 }));
                 
-                // 3. Временное решение - через 2 секунды показываем ошибку,
-                // если не получили ответ от бота
-                setTimeout(() => {
-                    if (document.getElementById('gamesContainer').innerHTML.includes('Загрузка игр...')) {
-                        throw new Error("Timeout - no response from bot");
-                    }
-                }, 2000);
-                
             } catch (error) {
-                console.error("Ошибка загрузки:", error);
-                showError("Не удалось загрузить игры. Попробуйте позже.");
+                console.error("Ошибка:", error);
+                showError("Ошибка загрузки. Попробуйте позже.");
             }
         }
         
-        // Функция отображения ошибки
+        // Функция показа ошибки
         function showError(message) {
-            const container = document.getElementById('gamesContainer');
-            container.innerHTML = `
-                <div class="error-message">
+            gamesContainer.innerHTML = `
+                <div class="error">
                     ${message}
-                    <button onclick="location.reload()">⟳ Обновить</button>
+                    <button onclick="window.location.reload()">Обновить</button>
                 </div>
             `;
         }
         
-        // Инициализация при загрузке
-        document.addEventListener('DOMContentLoaded', () => {
-            loadGames();
+        // Обработчик кнопки корзины
+        cartBtn.addEventListener('click', () => {
+            tg.sendData(JSON.stringify({ action: "open_cart" }));
         });
+        
+        // Запуск при загрузке
+        document.addEventListener('DOMContentLoaded', loadGames);
     </script>
 </body>
 </html>
