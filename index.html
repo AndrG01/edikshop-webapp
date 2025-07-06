@@ -4,54 +4,63 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EdikShop</title>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://telegram.org; script-src 'self' https://telegram.org 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src * data:;">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        /* Ваши существующие стили */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+        }
+        #app {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .error {
+            color: red;
+            text-align: center;
+            padding: 20px;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
     </style>
 </head>
 <body>
     <div id="app">
-        <header>
-            <h1>EDIKSHOP</h1>
-            <button id="cartBtn">🛒 Корзина</button>
-        </header>
-        <div id="gamesContainer">
-            <div class="loading">Загрузка игр...</div>
+        <h1>EDIKSHOP</h1>
+        <div id="content">
+            <div class="loading">Загрузка данных...</div>
         </div>
     </div>
 
     <script>
-        // Инициализация WebApp
         const tg = window.Telegram.WebApp;
+        
+        // Инициализация WebApp
         tg.expand();
         tg.ready();
         
-        // Элементы интерфейса
-        const gamesContainer = document.getElementById('gamesContainer');
-        const cartBtn = document.getElementById('cartBtn');
-        
-        // Основная функция загрузки
-        async function loadGames() {
+        // Обработчик получения данных от бота
+        Telegram.WebApp.onEvent('webAppDataReceived', (event) => {
             try {
-                // 1. Показываем статус загрузки
-                gamesContainer.innerHTML = '<div class="loading">Загрузка игр...</div>';
+                const data = JSON.parse(event.data);
                 
-                // 2. Отправляем запрос к боту
-                tg.sendData(JSON.stringify({
-                    action: "get_games",
-                    user_id: tg.initDataUnsafe.user?.id
-                }));
-                
-            } catch (error) {
-                console.error("Ошибка:", error);
-                showError("Ошибка загрузки. Попробуйте позже.");
+                if (data.type === 'games_list') {
+                    renderGames(data.data);
+                } else if (data.type === 'error') {
+                    showError(data.message);
+                }
+            } catch (e) {
+                showError("Ошибка обработки данных");
+                console.error("Parse error:", e);
             }
-        }
+        });
         
-        // Функция показа ошибки
+        // Функция отображения ошибки
         function showError(message) {
-            gamesContainer.innerHTML = `
+            document.getElementById('content').innerHTML = `
                 <div class="error">
                     ${message}
                     <button onclick="window.location.reload()">Обновить</button>
@@ -59,13 +68,46 @@
             `;
         }
         
-        // Обработчик кнопки корзины
-        cartBtn.addEventListener('click', () => {
-            tg.sendData(JSON.stringify({ action: "open_cart" }));
-        });
+        // Функция отображения списка игр
+        function renderGames(games) {
+            let html = '<div class="games-list">';
+            
+            games.forEach(game => {
+                html += `
+                    <div class="game-item">
+                        <h3>${game.name}</h3>
+                        <p>Цена: ${game.price} руб.</p>
+                        <button onclick="addToCart('${game.name}')">В корзину</button>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            document.getElementById('content').innerHTML = html;
+        }
         
-        // Запуск при загрузке
-        document.addEventListener('DOMContentLoaded', loadGames);
+        // Функция добавления в корзину
+        function addToCart(gameName) {
+            tg.sendData(JSON.stringify({
+                action: "add_to_cart",
+                product: gameName
+            }));
+            tg.showAlert(`"${gameName}" добавлен в корзину!`);
+        }
+        
+        // Запрос данных при загрузке
+        document.addEventListener('DOMContentLoaded', () => {
+            tg.sendData(JSON.stringify({
+                action: "get_games"
+            }));
+            
+            // Таймаут на случай отсутствия ответа
+            setTimeout(() => {
+                if (document.getElementById('content').innerHTML.includes('Загрузка данных...')) {
+                    showError("Превышено время ожидания ответа");
+                }
+            }, 5000);
+        });
     </script>
 </body>
 </html>
