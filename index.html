@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -39,72 +39,69 @@
 </head>
 <body>
     <div id="app">
-        <h1>EDIKSHOP</h1>
-        <div id="content">
-            <div class="loading">Загрузка...</div>
-        </div>
+        <div id="content">Loading...</div>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
-        tg.expand();
-        tg.ready();
+        let connectionActive = true;
 
-        // Улучшенная функция отправки данных
-        function sendToBot(data) {
-            return new Promise((resolve, reject) => {
-                try {
-                    tg.sendData(JSON.stringify(data));
-                    resolve();
-                } catch (e) {
-                    reject(e);
+        // Система соединения
+        function initConnection() {
+            tg.expand();
+            tg.ready();
+            
+            tg.onEvent('viewportChanged', (e) => {
+                if (!e.isStateStable) {
+                    handleDisconnection();
                 }
             });
-        }
-
-        // Обработчик получения данных
-        Telegram.WebApp.onEvent('webAppDataReceived', (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                if (data.type === 'games_list') {
-                    renderGames(data.data);
+            
+            // Таймер для поддержания соединения
+            setInterval(() => {
+                if (connectionActive) {
+                    tg.sendData(JSON.stringify({action: "ping"}));
                 }
-            } catch (e) {
-                showError("Ошибка обработки данных");
-            }
-        });
-
-        function renderGames(games) {
-            let html = '';
-            games.forEach(game => {
-                html += `
-                    <div class="game-item">
-                        <h3>${game.name}</h3>
-                        <p>Платформа: ${game.platform}</p>
-                        <p>Цена: ${game.price} руб.</p>
-                        <button onclick="addToCart('${game.name}')">В корзину</button>
-                    </div>
-                `;
-            });
-            document.getElementById('content').innerHTML = html || '<div class="error">Нет доступных игр</div>';
+            }, 30000);
         }
 
-        async function addToCart(gameName) {
+        function handleDisconnection() {
+            connectionActive = false;
+            document.getElementById('content').innerHTML = 
+                '<div class="error">Connection lost. Reconnecting...</div>';
+            setTimeout(initConnection, 2000);
+        }
+
+        // Безопасная отправка данных
+        async function sendToBot(data) {
             try {
-                await sendToBot({action: "add_to_cart", product: gameName});
-                tg.showAlert(`"${gameName}" добавлен в корзину!`);
+                await new Promise((resolve, reject) => {
+                    try {
+                        tg.sendData(JSON.stringify(data));
+                        resolve();
+                    } catch (e) {
+                        reject(e);
+                    }
+                });
+                return true;
             } catch (e) {
-                showError("Ошибка добавления в корзину");
+                console.error("Send error:", e);
+                handleDisconnection();
+                return false;
             }
         }
 
         // Инициализация
-        document.addEventListener('DOMContentLoaded', async () => {
-            try {
-                await sendToBot({action: "get_games"});
-            } catch (e) {
-                showError("Ошибка загрузки данных");
-            }
+        document.addEventListener('DOMContentLoaded', () => {
+            initConnection();
+            
+            // Загрузка данных
+            (async function loadData() {
+                const success = await sendToBot({action: "get_games"});
+                if (success) {
+                    connectionActive = true;
+                }
+            })();
         });
     </script>
 </body>
