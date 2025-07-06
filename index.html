@@ -3,9 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
     <title>EdikShop</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
@@ -35,74 +32,180 @@
             text-align: center;
             padding: 20px;
         }
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
     </style>
 </head>
 <body>
     <div id="app">
-        <div id="content">Loading...</div>
+        <h1>EDIKSHOP</h1>
+        <div id="content">
+            <div class="loading">Загрузка данных...</div>
+        </div>
     </div>
 
     <script>
+        // Инициализация Telegram WebApp
         const tg = window.Telegram.WebApp;
-        let connectionActive = true;
+        
+        // Состояние приложения
+        const appState = {
+            connectionActive: true,
+            retryCount: 0
+        };
 
-        // Система соединения
-        function initConnection() {
-            tg.expand();
-            tg.ready();
-            
-            tg.onEvent('viewportChanged', (e) => {
-                if (!e.isStateStable) {
-                    handleDisconnection();
-                }
-            });
-            
-            // Таймер для поддержания соединения
-            setInterval(() => {
-                if (connectionActive) {
-                    tg.sendData(JSON.stringify({action: "ping"}));
-                }
-            }, 30000);
-        }
-
-        function handleDisconnection() {
-            connectionActive = false;
-            document.getElementById('content').innerHTML = 
-                '<div class="error">Connection lost. Reconnecting...</div>';
-            setTimeout(initConnection, 2000);
-        }
-
-        // Безопасная отправка данных
-        async function sendToBot(data) {
+        // Инициализация соединения
+        function initApp() {
             try {
-                await new Promise((resolve, reject) => {
-                    try {
-                        tg.sendData(JSON.stringify(data));
-                        resolve();
-                    } catch (e) {
-                        reject(e);
-                    }
-                });
-                return true;
-            } catch (e) {
-                console.error("Send error:", e);
-                handleDisconnection();
-                return false;
+                tg.expand();
+                tg.ready();
+                
+                // Настройка обработчиков событий
+                setupEventListeners();
+                
+                // Начальная загрузка данных
+                loadInitialData();
+                
+            } catch (error) {
+                console.error('Init error:', error);
+                showError('Ошибка инициализации');
             }
         }
 
-        // Инициализация
-        document.addEventListener('DOMContentLoaded', () => {
-            initConnection();
+        // Настройка обработчиков событий
+        function setupEventListeners() {
+            // Обработчик получения данных от бота
+            Telegram.WebApp.onEvent('webAppDataReceived', handleIncomingData);
             
-            // Загрузка данных
-            (async function loadData() {
-                const success = await sendToBot({action: "get_games"});
-                if (success) {
-                    connectionActive = true;
+            // Обработчик изменений видимости
+            Telegram.WebApp.onEvent('viewportChanged', handleViewportChange);
+        }
+
+        // Обработка входящих данных
+        function handleIncomingData(event) {
+            try {
+                const data = JSON.parse(event.data);
+                
+                if (data.type === 'games_list') {
+                    renderGames(data.data);
+                    appState.connectionActive = true;
+                    appState.retryCount = 0;
+                } else if (data.type === 'error') {
+                    showError(data.message || 'Ошибка сервера');
                 }
-            })();
-        });
+            } catch (error) {
+                console.error('Data parsing error:', error);
+                showError('Ошибка обработки данных');
+            }
+        }
+
+        // Обработчик изменения видимости
+        function handleViewportChange(event) {
+            if (!event.isStateStable) {
+                handleConnectionIssue();
+            }
+        }
+
+        // Загрузка начальных данных
+        function loadInitialData() {
+            sendDataToBot({ action: "get_games" })
+                .catch(error => {
+                    console.error('Initial load error:', error);
+                    handleConnectionIssue();
+                });
+        }
+
+        // Безопасная отправка данных боту
+        async function sendDataToBot(data) {
+            return new Promise((resolve, reject) => {
+                try {
+                    Telegram.WebApp.sendData(JSON.stringify(data), (success) => {
+                        if (success) {
+                            resolve();
+                        } else {
+                            reject(new Error('Send failed'));
+                        }
+                    });
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        }
+
+        // Обработка проблем с соединением
+        function handleConnectionIssue() {
+            appState.connectionActive = false;
+            appState.retryCount++;
+            
+            showError('Проблемы с соединением. Повторная попытка...');
+            
+            if (appState.retryCount <= 3) {
+                setTimeout(() => {
+                    sendDataToBot({ action: "get_games" })
+                        .then(() => {
+                            appState.connectionActive = true;
+                            appState.retryCount = 0;
+                        })
+                        .catch(handleConnectionIssue);
+                }, 2000 * appState.retryCount);
+            } else {
+                showError('Не удалось установить соединение. Пожалуйста, попробуйте позже.');
+            }
+        }
+
+        // Отображение списка игр
+        function renderGames(games) {
+            let html = '';
+            
+            if (games && games.length > 0) {
+                games.forEach(game => {
+                    html += `
+                        <div class="game-item">
+                            <h3>${game.name}</h3>
+                            <p>Платформа: ${game.platform || 'Не указана'}</p>
+                            <p>Цена: ${game.price} руб.</p>
+                            <button onclick="addToCart('${game.name.replace(/'/g, "\\'")}')">
+                                В корзину
+                            </button>
+                        </div>
+                    `;
+                });
+            } else {
+                html = '<div class="error">Нет доступных игр</div>';
+            }
+            
+            document.getElementById('content').innerHTML = html;
+        }
+
+        // Добавление в корзину
+        function addToCart(gameName) {
+            sendDataToBot({ 
+                action: "add_to_cart",
+                product: gameName
+            })
+            .then(() => {
+                Telegram.WebApp.showAlert(`"${gameName}" добавлен в корзину!`);
+            })
+            .catch(error => {
+                console.error('Add to cart error:', error);
+                Telegram.WebApp.showAlert('Не удалось добавить в корзину');
+            });
+        }
+
+        // Отображение ошибки
+        function showError(message) {
+            document.getElementById('content').innerHTML = `
+                <div class="error">
+                    ${message}
+                    <button onclick="window.location.reload()">Обновить</button>
+                </div>
+            `;
+        }
+
+        // Запуск приложения при загрузке
+        document.addEventListener('DOMContentLoaded', initApp);
     </script>
 </body>
 </html>
