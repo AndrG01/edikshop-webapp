@@ -59,17 +59,40 @@
             retryCount: 0
         };
 
+        // Добавьте эту функцию в начало скрипта
+        function parseInitialData() {
+            const hash = window.location.hash.substring(1);
+            if (hash) {
+                try {
+                    const data = JSON.parse(decodeURIComponent(hash));
+                    handleIncomingData({ data: JSON.stringify(data) });
+                } catch (e) {
+                    console.error('Error parsing initial data:', e);
+                    loadInitialData();
+                }
+            } else {
+                loadInitialData();
+            }
+        }
+
         // Инициализация соединения
         function initApp() {
+            if (!window.Telegram || !window.Telegram.WebApp) {
+                showError('WebApp Telegram не инициализирован');
+                return;
+            }
+            
             try {
                 tg.expand();
                 tg.ready();
                 
-                // Настройка обработчиков событий
-                setupEventListeners();
+                if (!tg.initDataUnsafe) {
+                    showError('Приложение должно быть запущено через Telegram');
+                    return;
+                }
                 
-                // Начальная загрузка данных
-                loadInitialData();
+                setupEventListeners();
+                parseInitialData(); // Заменяем loadInitialData()
                 
             } catch (error) {
                 console.error('Init error:', error);
