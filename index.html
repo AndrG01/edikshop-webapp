@@ -98,46 +98,44 @@
             }
         }
         
-        // Обновленная функция initApp
+        // Упрощенная инициализация
         function initApp() {
             if (!window.Telegram || !window.Telegram.WebApp) {
                 showError('WebApp Telegram не инициализирован');
                 return;
             }
             
-            try {
-                tg.expand();
-                tg.ready();
-                
-                if (!tg.initDataUnsafe?.user?.id) {
-                    showError('Приложение должно быть запущено через Telegram');
-                    return;
-                }
-                
-                setupEventListeners();
-                
-                // Проверяем, есть ли данные в URL
-                const hash = window.location.hash.substring(1);
-                if (hash) {
-                    try {
-                        const data = JSON.parse(decodeURIComponent(hash));
-                        if (data.type === 'games_list') {
-                            renderGames(data.data);
-                            return;
-                        }
-                    } catch (e) {
-                        console.error('Error parsing URL data:', e);
-                    }
-                }
-                
-                // Если нет данных в URL, запрашиваем у бота
-                requestGamesFromBot();
-                
-            } catch (error) {
-                console.error('Init error:', error);
-                showError('Ошибка инициализации');
-            }
+            Telegram.WebApp.expand();
+            Telegram.WebApp.ready();
+            
+            // Запрашиваем данные сразу при загрузке
+            requestGames();
         }
+        
+        // Запрос данных
+        function requestGames() {
+            Telegram.WebApp.sendData(JSON.stringify({
+                action: "get_games"
+            }));
+        }
+        
+        // Обработчик входящих данных
+        Telegram.WebApp.onEvent('webAppDataReceived', (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                
+                if (data.type === 'webapp_data' && data.payload.action === 'games_list') {
+                    renderGames(data.payload.data);
+                } else if (data.type === 'error') {
+                    showError(data.message);
+                }
+            } catch (e) {
+                console.error('Parse error:', e);
+                showError('Ошибка обработки данных');
+            }
+        });
+        
+        // Остальные функции (renderGames, addToCart и т.д.) остаются без изменений
         
         // Настройка обработчиков событий
         function setupEventListeners() {
