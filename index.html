@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>EdikShop</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
@@ -84,15 +87,18 @@
         }
 
         // Обработка входящих данных
+        // Заменяем функцию handleIncomingData
         function handleIncomingData(event) {
             try {
                 const data = JSON.parse(event.data);
                 
-                if (data.type === 'games_list') {
-                    renderGames(data.data);
-                    appState.connectionActive = true;
-                    appState.retryCount = 0;
-                } else if (data.type === 'error') {
+                if (data.type === 'webapp_data') {
+                    if (data.payload.action === 'games_list') {
+                        renderGames(data.payload.data);
+                        appState.connectionActive = true;
+                        appState.retryCount = 0;
+                    }
+                } else if (data.type === 'webapp_error') {
                     showError(data.message || 'Ошибка сервера');
                 }
             } catch (error) {
@@ -100,21 +106,21 @@
                 showError('Ошибка обработки данных');
             }
         }
+        
+        // Обновляем функцию loadInitialData
+        function loadInitialData() {
+            Telegram.WebApp.sendData(JSON.stringify({ action: "get_games" }), (success) => {
+                if (!success) {
+                    handleConnectionIssue();
+                }
+            });
+        }
 
         // Обработчик изменения видимости
         function handleViewportChange(event) {
             if (!event.isStateStable) {
                 handleConnectionIssue();
             }
-        }
-
-        // Загрузка начальных данных
-        function loadInitialData() {
-            sendDataToBot({ action: "get_games" })
-                .catch(error => {
-                    console.error('Initial load error:', error);
-                    handleConnectionIssue();
-                });
         }
 
         // Безопасная отправка данных боту
