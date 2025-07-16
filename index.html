@@ -75,7 +75,30 @@
             }
         }
 
-        // Инициализация соединения
+        // Новая функция для запроса данных
+        async function requestGamesFromBot() {
+            try {
+                const response = await fetch(`https://api.telegram.org/bot${YOUR_BOT_TOKEN}/sendMessage`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        chat_id: tg.initDataUnsafe.user.id,
+                        text: "/get_webapp_data"
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+            } catch (error) {
+                console.error('Error requesting games:', error);
+                handleConnectionIssue();
+            }
+        }
+        
+        // Обновленная функция initApp
         function initApp() {
             if (!window.Telegram || !window.Telegram.WebApp) {
                 showError('WebApp Telegram не инициализирован');
@@ -86,20 +109,36 @@
                 tg.expand();
                 tg.ready();
                 
-                if (!tg.initDataUnsafe) {
+                if (!tg.initDataUnsafe?.user?.id) {
                     showError('Приложение должно быть запущено через Telegram');
                     return;
                 }
                 
                 setupEventListeners();
-                parseInitialData(); // Заменяем loadInitialData()
+                
+                // Проверяем, есть ли данные в URL
+                const hash = window.location.hash.substring(1);
+                if (hash) {
+                    try {
+                        const data = JSON.parse(decodeURIComponent(hash));
+                        if (data.type === 'games_list') {
+                            renderGames(data.data);
+                            return;
+                        }
+                    } catch (e) {
+                        console.error('Error parsing URL data:', e);
+                    }
+                }
+                
+                // Если нет данных в URL, запрашиваем у бота
+                requestGamesFromBot();
                 
             } catch (error) {
                 console.error('Init error:', error);
                 showError('Ошибка инициализации');
             }
         }
-
+        
         // Настройка обработчиков событий
         function setupEventListeners() {
             // Обработчик получения данных от бота
